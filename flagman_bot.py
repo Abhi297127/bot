@@ -7,45 +7,66 @@ BOT_TOKEN = "8113983053:AAGFw-EVPsk05Cmcg2Dc7Iw7jCb0O7_SxIc"
 # Command: /report <total_personnel>
 def report(update, context):
     try:
-        total_personnel = int(context.args[0]) if context.args else 38  # default 38
-
-        # Format today’s date
+        # Get total personnel from command argument, default to 38
+        total_personnel = int(context.args[0]) if context.args else 38
+        
+        # Calculate flagmen (assuming 1 supervisor always)
+        flagmen_count = total_personnel - 1
+        
+        # Format today's date
         date_str = datetime.now().strftime("%d-%m-%Y")
-
-        # Report template
+        
+        # Report template with dynamic total
         report_message = f"""*🚧 Flagman Distribution Report – {date_str}*
 
-*GIS + MB (7)* – Cocklain x2, Bobcut, JCB, Compactor, Excavator, Roller  
-*Chiller Area (6)* – JCB, Roller, Compactor, Mini Roller, Bobcat, Dumper  
-*SSD (5)* – Hydra, DCM, Roller, Trailer, Bobcat  
-*Gate (5)* – Tough Rider, Unicrane, Loader, Hydra, Forklift  
-*NCC Office (5)* – Main Lift, Hydra, Bobcat, DCM, Dumper  
-*Store (5)* – Assigned x5  
-*Additional Allocation (5)* – Deployed as per site requirement  
-*Supervisor (1)* – Site Coordination  
+*GIS + MB (7)* – Cocklain x2, Bobcut, JCB, Compactor, Excavator, Roller
 
-*Total Personnel: {total_personnel} (37 Flagmen + 1 Supervisor)*
-"""
+*Chiller Area (6)* – JCB, Roller, Compactor, Mini Roller, Bobcat, Dumper
+
+*SSD (5)* – Hydra, DCM, Roller, Trailer, Bobcat
+
+*Gate (5)* – Tough Rider, Unicrane, Loader, Hydra, Forklift
+
+*NCC Office (5)* – Main Lift, Hydra, Bobcat, DCM, Dumper
+
+*Store (5)* – Assigned x5
+
+*Additional Allocation (5)* – Deployed as per site requirement
+
+*Supervisor (1)* – Site Coordination
+
+*Total Personnel: {total_personnel} ({flagmen_count} Flagmen + 1 Supervisor)*"""
 
         context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=report_message,
             parse_mode="Markdown"
         )
-
+        
+    except ValueError:
+        update.message.reply_text("Please provide a valid number. Usage: /report <number>")
+    except IndexError:
+        update.message.reply_text("Please provide the total personnel count. Usage: /report <number>")
     except Exception as e:
-        update.message.reply_text(f"Error: {e}")
+        update.message.reply_text(f"Error: {str(e)}")
 
 def start(update, context):
-    update.message.reply_text("Welcome! Use /report <total_personnel> to get today’s distribution report.")
+    welcome_message = """Welcome to Flagman Distribution Bot! 🚧
+
+Use `/report <total_personnel>` to get today's distribution report.
+
+Example: `/report 30` for 30 total personnel"""
+    
+    update.message.reply_text(welcome_message)
 
 def main():
     updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
-
+    
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("report", report))
-
+    
+    print("Bot started successfully!")
     updater.start_polling()
     updater.idle()
 
