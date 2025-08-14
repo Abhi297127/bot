@@ -1,20 +1,11 @@
-import asyncio
-import logging
+from telegram.ext import Updater, CommandHandler
 from datetime import datetime
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-# Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
 
 # Replace with your bot token
 BOT_TOKEN = "8113983053:AAGFw-EVPsk05Cmcg2Dc7Iw7jCb0O7_SxIc"
 
 # Command: /report <total_personnel>
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def report(update, context):
     try:
         # Get total personnel from command argument, default to 38
         total_personnel = int(context.args[0]) if context.args else 38
@@ -46,39 +37,38 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 *Total Personnel: {total_personnel} ({flagmen_count} Flagmen + 1 Supervisor)*"""
 
-        await update.message.reply_text(
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
             text=report_message,
             parse_mode="Markdown"
         )
         
     except ValueError:
-        await update.message.reply_text("Please provide a valid number. Usage: /report <number>")
+        update.message.reply_text("Please provide a valid number. Usage: /report <number>")
     except IndexError:
-        await update.message.reply_text("Please provide the total personnel count. Usage: /report <number>")
+        update.message.reply_text("Please provide the total personnel count. Usage: /report <number>")
     except Exception as e:
-        await update.message.reply_text(f"Error: {str(e)}")
+        update.message.reply_text(f"Error: {str(e)}")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def start(update, context):
     welcome_message = """Welcome to Flagman Distribution Bot! 🚧
 
 Use `/report <total_personnel>` to get today's distribution report.
 
 Example: `/report 30` for 30 total personnel"""
     
-    await update.message.reply_text(welcome_message)
+    update.message.reply_text(welcome_message)
 
 def main():
-    # Create the Application
-    application = Application.builder().token(BOT_TOKEN).build()
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
     
-    # Register handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("report", report))
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("report", report))
     
     print("Bot started successfully!")
-    
-    # Run the bot
-    application.run_polling()
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == "__main__":
     main()
