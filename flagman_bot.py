@@ -3,6 +3,9 @@ import logging
 from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+from flask import Flask, request
+import asyncio
+import threading
 
 # Set up logging
 logging.basicConfig(
@@ -11,8 +14,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Get bot token from environment variable (more secure)
+# Get bot token and port
 BOT_TOKEN = os.getenv('BOT_TOKEN', "8113983053:AAGFw-EVPsk05Cmcg2Dc7Iw7jCb0O7_SxIc")
+PORT = int(os.getenv('PORT', 5000))
+
+# Flask app for webhook
+app = Flask(__name__)
+
+# Global variable to store the application
+telegram_app = None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
@@ -81,39 +91,66 @@ Generated at: {datetime.now().strftime("%H:%M:%S")}"""
             parse_mode="Markdown"
         )
         
-        logger.info(f"Report generated for {total_personnel} personnel by user {update.effective_user.id}")
+        logger.info(f"Report generated for {total_personnel} personnel")
         
-    except ValueError as ve:
+    except ValueError:
         error_msg = "❌ Please provide a valid positive number.\n\n*Usage:* `/report <number>`\n*Example:* `/report 30`"
         await update.message.reply_text(error_msg, parse_mode="Markdown")
-        logger.warning(f"Invalid input from user {update.effective_user.id}: {context.args}")
         
     except Exception as e:
         logger.error(f"Error in report command: {e}")
         await update.message.reply_text("❌ An error occurred while generating the report. Please try again.")
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    """Log errors caused by Updates."""
-    logger.error(f"Update {update} caused error {context.error}")
+@app.route('/')
+def health_check():
+    return "Flagman Bot is running! 🚧", 200
+
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def webhook():
+    """Handle incoming webhook updates."""
+    try:
+        json_data = request.get_json(force=True)
+        update = Update.de_json(json_data, telegram_app.bot)
+        
+        # Process the update in a new thread
+        def process_update():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(telegram_app.process_update(update))
+            loop.close()
+        
+        thread = threading.Thread(target=process_update)
+        thread.start()
+        
+        return "OK", 200
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return "ERROR", 500
+
+def setup_telegram_app():
+    """Set up the Telegram application."""
+    global telegram_app
+    
+    # Create application without polling
+    telegram_app = Application.builder().token(BOT_TOKEN).build()
+    
+    # Add handlers
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("report", report))
+    
+    logger.info("Telegram application set up successfully!")
 
 def main():
-    """Start the bot."""
+    """Start the bot with webhook."""
     try:
-        # Create application
-        application = Application.builder().token(BOT_TOKEN).build()
+        # Set up telegram app
+        setup_telegram_app()
         
-        # Add handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("report", report))
+        print("🚧 Flagman Distribution Bot starting...")
+        logger.info("Bot starting with webhook method")
         
-        # Add error handler
-        application.add_error_handler(error_handler)
-        
-        logger.info("Bot started successfully!")
-        print("🤖 Flagman Distribution Bot is running...")
-        
-        # Run the bot
-        application.run_polling(drop_pending_updates=True)
+        # Start Flask app
+        app.run(host='0.0.0.0', port=PORT, debug=False)
         
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
