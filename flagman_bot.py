@@ -1,11 +1,13 @@
-from telegram.ext import Updater, CommandHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 from datetime import datetime
+import asyncio
 
 # Replace with your bot token
 BOT_TOKEN = "8113983053:AAGFw-EVPsk05Cmcg2Dc7Iw7jCb0O7_SxIc"
 
 # Command: /report <total_personnel>
-def report(update, context):
+async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Get total personnel from command argument, default to 38
         total_personnel = int(context.args[0]) if context.args else 38
@@ -37,38 +39,39 @@ def report(update, context):
 
 *Total Personnel: {total_personnel} ({flagmen_count} Flagmen + 1 Supervisor)*"""
 
-        context.bot.send_message(
-            chat_id=update.effective_chat.id,
+        await update.message.reply_text(
             text=report_message,
             parse_mode="Markdown"
         )
         
     except ValueError:
-        update.message.reply_text("Please provide a valid number. Usage: /report <number>")
+        await update.message.reply_text("Please provide a valid number. Usage: /report <number>")
     except IndexError:
-        update.message.reply_text("Please provide the total personnel count. Usage: /report <number>")
+        await update.message.reply_text("Please provide the total personnel count. Usage: /report <number>")
     except Exception as e:
-        update.message.reply_text(f"Error: {str(e)}")
+        await update.message.reply_text(f"Error: {str(e)}")
 
-def start(update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = """Welcome to Flagman Distribution Bot! 🚧
 
 Use `/report <total_personnel>` to get today's distribution report.
 
 Example: `/report 30` for 30 total personnel"""
     
-    update.message.reply_text(welcome_message)
+    await update.message.reply_text(welcome_message)
 
 def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).build()
     
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("report", report))
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("report", report))
     
     print("Bot started successfully!")
-    updater.start_polling()
-    updater.idle()
+    
+    # Run the bot
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
